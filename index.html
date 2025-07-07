@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Strength Visualizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for signal bars and animations */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+
+        .signal-bar-container {
+            display: flex;
+            align-items: flex-end;
+            height: 40px; /* Max height for the tallest bar */
+            gap: 4px; /* Space between bars */
+        }
+
+        .signal-bar {
+            width: 8px; /* Width of each bar */
+            background-color: #cbd5e1; /* Default gray for inactive bars */
+            border-radius: 2px; /* Slightly rounded corners for bars */
+            transition: all 0.3s ease-in-out; /* Smooth transition for height and color */
+            box-shadow: inset 0 -1px 2px rgba(0,0,0,0.1); /* Inner shadow for depth */
+        }
+
+        /* Heights for individual bars */
+        .signal-bar:nth-child(1) { height: 10px; }
+        .signal-bar:nth-child(2) { height: 20px; }
+        .signal-bar:nth-child(3) { height: 30px; }
+        .signal-bar:nth-child(4) { height: 40px; }
+
+        /* Active bar colors */
+        .signal-bar.active-1 { background-color: #f87171; /* Red for low */ }
+        .signal-bar.active-2 { background-color: #fbbf24; /* Orange for medium */ }
+        .signal-bar.active-3 { background-color: #34d399; /* Green for good */ }
+        .signal-bar.active-4 { background-color: #10b981; /* Darker green for excellent */ }
+
+        /* Pulsing animation for active bars */
+        @keyframes pulse {
+            0% { transform: scaleY(1); opacity: 0.8; }
+            50% { transform: scaleY(1.05); opacity: 1; }
+            100% { transform: scaleY(1); opacity: 0.8; }
+        }
+
+        .signal-bar.active {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        /* Specific animation delays for a staggered effect */
+        .signal-bar:nth-child(1).active { animation-delay: 0s; }
+        .signal-bar:nth-child(2).active { animation-delay: 0.1s; }
+        .signal-bar:nth-child(3).active { animation-delay: 0.2s; }
+        .signal-bar:nth-child(4).active { animation-delay: 0.3s; }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full text-center border border-gray-200">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 flex items-center justify-center">
+            <svg class="w-8 h-8 mr-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9a1 1 0 000 2h2a1 1 0 100-2h-2z" clip-rule="evenodd"></path>
+            </svg>
+            Network Strength
+        </h1>
+
+        <div class="mb-8">
+            <p id="latency-display" class="text-5xl font-extrabold text-blue-600 mb-2">-- ms</p>
+            <p class="text-gray-500 text-sm">Latency</p>
+        </div>
+
+        <div class="flex flex-col items-center mb-8">
+            <div class="signal-bar-container mb-4">
+                <div class="signal-bar" id="bar1"></div>
+                <div class="signal-bar" id="bar2"></div>
+                <div class="signal-bar" id="bar3"></div>
+                <div class="signal-bar" id="bar4"></div>
+            </div>
+            <p id="strength-status" class="text-xl font-semibold text-gray-700">Checking...</p>
+        </div>
+
+        <div class="text-sm text-gray-400 mt-6">
+            <p>Updates every <span id="update-interval">5</span> seconds.</p>
+            <p class="mt-1">Latency check is simulated.</p>
+        </div>
+    </div>
+
+    <script>
+        const latencyDisplay = document.getElementById('latency-display');
+        const strengthStatus = document.getElementById('strength-status');
+        const bars = [
+            document.getElementById('bar1'),
+            document.getElementById('bar2'),
+            document.getElementById('bar3'),
+            document.getElementById('bar4')
+        ];
+        const updateIntervalSpan = document.getElementById('update-interval');
+
+        const UPDATE_INTERVAL_SECONDS = 5; // How often to update in seconds
+
+        /**
+         * Simulates a network ping by generating a random latency value.
+         * @returns {Promise<number>} Simulated Latency in ms.
+         */
+        async function checkLatency() {
+            return new Promise(resolve => {
+                // Simulate network latency with a random value between 30ms and 500ms
+                const simulatedLatency = Math.floor(Math.random() * 470) + 30;
+                setTimeout(() => {
+                    resolve(simulatedLatency);
+                }, Math.min(simulatedLatency, 500)); // Ensure setTimeout doesn't exceed a reasonable max
+            });
+        }
+
+        /**
+         * Updates the UI based on the calculated latency.
+         * Adjusts signal bars and status message.
+         * @param {number|string} latency - The latency in ms or 'N/A'.
+         */
+        function updateUI(latency) {
+            latencyDisplay.textContent = latency === 'N/A' ? 'N/A' : `${latency} ms`;
+
+            let activeBars = 0;
+            let statusText = "No Connection";
+            let statusColorClass = "text-red-500"; // Default for no connection
+
+            // Determine signal strength based on latency
+            if (typeof latency === 'number') {
+                if (latency < 50) {
+                    activeBars = 4;
+                    statusText = "Excellent";
+                    statusColorClass = "text-green-600";
+                } else if (latency < 150) {
+                    activeBars = 3;
+                    statusText = "Good";
+                    statusColorClass = "text-green-500";
+                } else if (latency < 300) {
+                    activeBars = 2;
+                    statusText = "Fair";
+                    statusColorClass = "text-yellow-500";
+                } else {
+                    activeBars = 1;
+                    statusText = "Poor";
+                    statusColorClass = "text-orange-500";
+                }
+            } else {
+                // If latency is 'N/A', activeBars remains 0, statusText and color are default
+                statusText = "Offline / Error";
+                statusColorClass = "text-red-500";
+            }
+
+            // Update signal bars
+            bars.forEach((bar, index) => {
+                bar.classList.remove('active', 'active-1', 'active-2', 'active-3', 'active-4');
+                bar.style.backgroundColor = '#cbd5e1'; // Reset to default gray
+
+                if (index < activeBars) {
+                    bar.classList.add('active', `active-${activeBars}`); // Add active class and color class
+                }
+            });
+
+            // Update strength status text and color
+            strengthStatus.textContent = statusText;
+            strengthStatus.className = `text-xl font-semibold ${statusColorClass}`; // Apply new color class
+        }
+
+        /**
+         * Main function to run the network check and update UI.
+         */
+        async function runNetworkCheck() {
+            strengthStatus.textContent = "Checking...";
+            strengthStatus.className = "text-xl font-semibold text-gray-700"; // Reset to default gray during check
+            bars.forEach(bar => {
+                bar.classList.remove('active', 'active-1', 'active-2', 'active-3', 'active-4');
+                bar.style.backgroundColor = '#cbd5e1'; // Reset to default gray
+            });
+            latencyDisplay.textContent = '-- ms';
+
+            const latency = await checkLatency();
+            updateUI(latency);
+
+            // Optional: Log network connection details if available
+            if (navigator.connection) {
+                console.log("Network Type:", navigator.connection.effectiveType);
+                console.log("Downlink Speed (Mbps):", navigator.connection.downlink);
+                console.log("RTT (ms):", navigator.connection.rtt);
+            }
+        }
+
+        // Set the update interval display
+        updateIntervalSpan.textContent = UPDATE_INTERVAL_SECONDS;
+
+        // Run the check immediately on load
+        window.onload = function() {
+            runNetworkCheck();
+            // Set up interval for auto-updates
+            setInterval(runNetworkCheck, UPDATE_INTERVAL_SECONDS * 1000);
+        };
+    </script>
+</body>
+</html>
